@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "@doist/todoist-api-typescript": "^2.1.2",
+    "@doist/todoist-api-typescript": "^3.0.0",
     "@notionhq/client": "^2.2.2",
     "dotenv": "^16.0.3"
   },
