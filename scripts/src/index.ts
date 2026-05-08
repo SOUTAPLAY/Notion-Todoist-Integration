@@ -20,9 +20,6 @@ const notionApi: Client = new Client({auth: notionKey});
 
 // ------------ General helper function ---------------------- //
 
-/**
- * It takes an object and returns a Map with the same keys and values
- */
 function objectToMap(object: object): Map<string, any> {
   const map = new Map();
   const keys = Object.keys(object);
@@ -33,9 +30,6 @@ function objectToMap(object: object): Map<string, any> {
   return map;
 }
 
-/**
- * Sorts task list by creation time (bubble sort)
- */
 function bubbleSortTaskList(taskList: Array<PageObjectResponse>): void {
   let swapCounter = -1;
   while (swapCounter !== 0) {
@@ -142,10 +136,6 @@ async function notionNeedsUpdatePages(): Promise<PageObjectResponse[]> {
 
 // --------------- Task/Page creation & update functions --------------//
 
-/**
- * v3 breaking change: Task.isCompleted -> Task.checked
- * v3 breaking change: task.url field may be task.url (kept same)
- */
 async function newNotionPage(todoistTask: Task): Promise<PageObjectResponse> {
   const newPage = (await notionApi.pages.create({
     parent: {
@@ -160,8 +150,7 @@ async function newNotionPage(todoistTask: Task): Promise<PageObjectResponse> {
         number: Number(todoistTask.id),
       },
       Status: {
-        // v3: isCompleted -> checked
-        checkbox: (todoistTask as any).checked ?? false,
+        checkbox: todoistTask.isCompleted ?? false,
       },
       URL: {
         url: todoistTask.url ?? null,
@@ -181,7 +170,6 @@ async function newNotionPage(todoistTask: Task): Promise<PageObjectResponse> {
   })) as PageObjectResponse;
 
   const pageID = newPage.id;
-  // v3: due.date is still available
   if (todoistTask.due) {
     await notionApi.pages.update({
       page_id: pageID,
@@ -209,8 +197,7 @@ async function updateNotionPage(
         number: Number(todoistTask.id),
       },
       Status: {
-        // v3: isCompleted -> checked
-        checkbox: (todoistTask as any).checked ?? false,
+        checkbox: todoistTask.isCompleted ?? false,
       },
       URL: {
         url: todoistTask.url ?? null,
@@ -247,11 +234,10 @@ async function newTodoistTask(notionPageObject: PageObjectResponse): Promise<Tas
   const notionDescription = getNotionDescriptionProperty(notionPageObject);
   const notionDue = getNotionDueProperty(notionPageObject);
 
-  // v3 breaking change: dueDate (string) -> due: { date: string }
   return await todoistApi.addTask({
     content: notionTitle,
     description: notionDescription,
-    ...(notionDue ? {due: {date: notionDue}} : {}),
+    ...(notionDue ? {dueDate: notionDue} : {}),
   });
 }
 
@@ -263,11 +249,10 @@ async function updateTodoistTask(
   const notionDescription = getNotionDescriptionProperty(notionPageObject);
   const notionDue = getNotionDueProperty(notionPageObject);
 
-  // v3 breaking change: dueDate (string) -> due: { date: string }
   return await todoistApi.updateTask(taskID, {
     content: notionTitle,
     description: notionDescription,
-    ...(notionDue ? {due: {date: notionDue}} : {}),
+    ...(notionDue ? {dueDate: notionDue} : {}),
   });
 }
 
@@ -296,11 +281,7 @@ function myNotionIndexOf(notionpageID: string): number {
 }
 
 async function storeCurrentSyncedTasks(): Promise<void> {
-  // v3 breaking change: getTasks() returns GetTasksResponse, not Task[]
-  const response = await todoistApi.getTasks({});
-  const todoistTaskList: Task[] = Array.isArray(response)
-    ? response
-    : (response as any).results ?? (response as any).items ?? [];
+  const todoistTaskList: Task[] = await todoistApi.getTasks();
   const len: number = todoistTaskList.length;
 
   for (let i = 0; i < len; i++) {
@@ -331,12 +312,12 @@ async function bubbleSortIDs(): Promise<void> {
       const todoistTask: Task = await todoistApi.getTask(todoistID);
       const nextTodoistTask: Task = await todoistApi.getTask(nextTodoistID);
 
-      // v3: createdAt field may be addedAt
+      // v4: createdAt field
       const createdTime = new Date(
-        (todoistTask as any).addedAt ?? (todoistTask as any).createdAt
+        (todoistTask as any).createdAt ?? (todoistTask as any).addedAt
       );
       const nextCreatedTime = new Date(
-        (nextTodoistTask as any).addedAt ?? (nextTodoistTask as any).createdAt
+        (nextTodoistTask as any).createdAt ?? (nextTodoistTask as any).addedAt
       );
 
       if (createdTime > nextCreatedTime) {
@@ -363,8 +344,7 @@ async function checkTodoistCompletion(
     for (let i = 0; i < IDs.todoistTaskIDs.length; i++) {
       const todoistID = IDs.todoistTaskIDs[i];
       const todoistTask = await todoistApi.getTask(todoistID);
-      // v3: isCompleted -> checked
-      if ((todoistTask as any).checked) {
+      if (todoistTask.isCompleted) {
         await updateNotionPage(IDs.notionPageIDs[i], todoistTask);
       }
     }
@@ -418,11 +398,7 @@ async function checkNotionCompletion(
 async function checkNotionIncompletion(
   taskList: Array<PageObjectResponse>
 ): Promise<void> {
-  // v3: getTasks returns GetTasksResponse
-  const response = await todoistApi.getTasks({});
-  const activeTodoistTasks: Array<Task> = Array.isArray(response)
-    ? response
-    : (response as any).results ?? (response as any).items ?? [];
+  const activeTodoistTasks: Array<Task> = await todoistApi.getTasks();
   const activeTodoistTaskIds: Array<string> = activeTodoistTasks.map(t => t.id);
 
   const len = taskList.length;
@@ -443,11 +419,7 @@ async function checkNotionIncompletion(
 async function notionUpToDateCheck(
   lastCheckedTodoistIndex: number
 ): Promise<number> {
-  // v3: getTasks returns GetTasksResponse
-  const response = await todoistApi.getTasks({});
-  const taskList: Array<Task> = Array.isArray(response)
-    ? response
-    : (response as any).results ?? (response as any).items ?? [];
+  const taskList: Array<Task> = await todoistApi.getTasks();
 
   lastCheckedTodoistIndex = await checkTodoistCompletion(
     lastCheckedTodoistIndex,
@@ -543,11 +515,7 @@ async function notionManualUpdates(): Promise<void> {
 }
 
 async function todoistManualUpdates(): Promise<void> {
-  // v3: getTasks returns GetTasksResponse
-  const response = await todoistApi.getTasks({filter: 'p3'});
-  const taskList: Array<Task> = Array.isArray(response)
-    ? response
-    : (response as any).results ?? (response as any).items ?? [];
+  const taskList: Array<Task> = await todoistApi.getTasks({filter: 'p3'});
 
   if (taskList.length) {
     for (let i = 0; i < taskList.length; i++) {
