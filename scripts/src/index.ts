@@ -234,10 +234,11 @@ async function newTodoistTask(notionPageObject: PageObjectResponse): Promise<Tas
   const notionDescription = getNotionDescriptionProperty(notionPageObject);
   const notionDue = getNotionDueProperty(notionPageObject);
 
+  // v4: dueDate -> dueString
   return await todoistApi.addTask({
     content: notionTitle,
     description: notionDescription,
-    ...(notionDue ? {dueDate: notionDue} : {}),
+    ...(notionDue ? {dueString: notionDue} : {}),
   });
 }
 
@@ -249,10 +250,11 @@ async function updateTodoistTask(
   const notionDescription = getNotionDescriptionProperty(notionPageObject);
   const notionDue = getNotionDueProperty(notionPageObject);
 
+  // v4: dueDate -> dueString
   return await todoistApi.updateTask(taskID, {
     content: notionTitle,
     description: notionDescription,
-    ...(notionDue ? {dueDate: notionDue} : {}),
+    ...(notionDue ? {dueString: notionDue} : {}),
   });
 }
 
@@ -281,7 +283,9 @@ function myNotionIndexOf(notionpageID: string): number {
 }
 
 async function storeCurrentSyncedTasks(): Promise<void> {
-  const todoistTaskList: Task[] = await todoistApi.getTasks();
+  // v4: getTasks() returns GetTasksResponse, unwrap with .results
+  const response = await todoistApi.getTasks({});
+  const todoistTaskList: Task[] = (response as any).results ?? (response as any).items ?? (response as any);
   const len: number = todoistTaskList.length;
 
   for (let i = 0; i < len; i++) {
@@ -312,7 +316,6 @@ async function bubbleSortIDs(): Promise<void> {
       const todoistTask: Task = await todoistApi.getTask(todoistID);
       const nextTodoistTask: Task = await todoistApi.getTask(nextTodoistID);
 
-      // v4: createdAt field
       const createdTime = new Date(
         (todoistTask as any).createdAt ?? (todoistTask as any).addedAt
       );
@@ -398,7 +401,9 @@ async function checkNotionCompletion(
 async function checkNotionIncompletion(
   taskList: Array<PageObjectResponse>
 ): Promise<void> {
-  const activeTodoistTasks: Array<Task> = await todoistApi.getTasks();
+  // v4: getTasks() returns GetTasksResponse, unwrap with .results
+  const response = await todoistApi.getTasks({});
+  const activeTodoistTasks: Array<Task> = (response as any).results ?? (response as any).items ?? (response as any);
   const activeTodoistTaskIds: Array<string> = activeTodoistTasks.map(t => t.id);
 
   const len = taskList.length;
@@ -419,7 +424,9 @@ async function checkNotionIncompletion(
 async function notionUpToDateCheck(
   lastCheckedTodoistIndex: number
 ): Promise<number> {
-  const taskList: Array<Task> = await todoistApi.getTasks();
+  // v4: getTasks() returns GetTasksResponse, unwrap with .results
+  const response = await todoistApi.getTasks({});
+  const taskList: Array<Task> = (response as any).results ?? (response as any).items ?? (response as any);
 
   lastCheckedTodoistIndex = await checkTodoistCompletion(
     lastCheckedTodoistIndex,
@@ -515,7 +522,11 @@ async function notionManualUpdates(): Promise<void> {
 }
 
 async function todoistManualUpdates(): Promise<void> {
-  const taskList: Array<Task> = await todoistApi.getTasks({filter: 'p3'});
+  // v4: use getTasks with label filter; filter param removed, use getTasksByFilter or filter client-side
+  const response = await todoistApi.getTasks({});
+  const allTasks: Array<Task> = (response as any).results ?? (response as any).items ?? (response as any);
+  // p3 = priority 3; filter client-side since v4 removed filter param from getTasks
+  const taskList: Array<Task> = allTasks.filter(t => t.priority === 3);
 
   if (taskList.length) {
     for (let i = 0; i < taskList.length; i++) {
