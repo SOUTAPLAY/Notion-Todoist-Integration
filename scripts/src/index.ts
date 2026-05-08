@@ -1,24 +1,18 @@
-import dotenv = require('dotenv'); // key environment
-import {Task, TodoistApi} from '@doist/todoist-api-typescript'; // todoist api
-import {Client} from '@notionhq/client'; // notion api
+import dotenv = require('dotenv');
+import {Task, TodoistApi} from '@doist/todoist-sdk';
+import {Client} from '@notionhq/client';
 import {
   PageObjectResponse,
   QueryDatabaseResponse,
 } from '@notionhq/client/build/src/api-endpoints';
-
-// ------------------- auth keys ------------------------------//
 
 dotenv.config();
 const todoistKey = String(process.env.TODOISTKEY);
 const notionKey = String(process.env.NOTIONKEY);
 const databaseId = String(process.env.DATABASEID);
 
-// ----------------- API initialisations -----------------------//
-
 const todoistApi: TodoistApi = new TodoistApi(todoistKey);
 const notionApi: Client = new Client({auth: notionKey});
-
-// ------------ General helper function ---------------------- //
 
 function objectToMap(object: object): Map<string, any> {
   const map = new Map();
@@ -45,8 +39,6 @@ function bubbleSortTaskList(taskList: Array<PageObjectResponse>): void {
     }
   }
 }
-
-// ------------ Get Notion Property functions ----------------- //
 
 function getNotionDescriptionProperty(pageObject: PageObjectResponse): string {
   const propertiesObject = pageObject.properties as object;
@@ -92,8 +84,6 @@ function getNotionTitleProperty(pageObject: PageObjectResponse): string {
   return objectToMap(titleobject).get('plain_text');
 }
 
-// ----------------- API query/search functions -------------------- //
-
 async function IDSearchNotion(
   todoistID: number
 ): Promise<PageObjectResponse | null> {
@@ -133,8 +123,6 @@ async function notionNeedsUpdatePages(): Promise<PageObjectResponse[]> {
   });
   return queryResponse.results as Array<PageObjectResponse>;
 }
-
-// --------------- Task/Page creation & update functions --------------//
 
 async function newNotionPage(todoistTask: Task): Promise<PageObjectResponse> {
   const newPage = (await notionApi.pages.create({
@@ -234,7 +222,6 @@ async function newTodoistTask(notionPageObject: PageObjectResponse): Promise<Tas
   const notionDescription = getNotionDescriptionProperty(notionPageObject);
   const notionDue = getNotionDueProperty(notionPageObject);
 
-  // v4: dueDate -> dueString
   return await todoistApi.addTask({
     content: notionTitle,
     description: notionDescription,
@@ -250,15 +237,12 @@ async function updateTodoistTask(
   const notionDescription = getNotionDescriptionProperty(notionPageObject);
   const notionDue = getNotionDueProperty(notionPageObject);
 
-  // v4: dueDate -> dueString
   return await todoistApi.updateTask(taskID, {
     content: notionTitle,
     description: notionDescription,
     ...(notionDue ? {dueString: notionDue} : {}),
   });
 }
-
-// -------------- Structure (query/search/store) functions ------------//
 
 function myTodoistIndexOf(todoistID: string): number {
   let index: number;
@@ -283,9 +267,7 @@ function myNotionIndexOf(notionpageID: string): number {
 }
 
 async function storeCurrentSyncedTasks(): Promise<void> {
-  // v4: getTasks() returns GetTasksResponse, unwrap with .results
-  const response = await todoistApi.getTasks({});
-  const todoistTaskList: Task[] = (response as any).results ?? (response as any).items ?? (response as any);
+  const todoistTaskList: Task[] = await todoistApi.getTasks();
   const len: number = todoistTaskList.length;
 
   for (let i = 0; i < len; i++) {
@@ -333,8 +315,6 @@ async function bubbleSortIDs(): Promise<void> {
     }
   }
 }
-
-// -------------- Notion <-> Todoist auto sync functions ----------------//
 
 async function checkTodoistCompletion(
   lastCheckedTodoistIndex: number,
@@ -401,9 +381,7 @@ async function checkNotionCompletion(
 async function checkNotionIncompletion(
   taskList: Array<PageObjectResponse>
 ): Promise<void> {
-  // v4: getTasks() returns GetTasksResponse, unwrap with .results
-  const response = await todoistApi.getTasks({});
-  const activeTodoistTasks: Array<Task> = (response as any).results ?? (response as any).items ?? (response as any);
+  const activeTodoistTasks: Array<Task> = await todoistApi.getTasks();
   const activeTodoistTaskIds: Array<string> = activeTodoistTasks.map(t => t.id);
 
   const len = taskList.length;
@@ -424,9 +402,7 @@ async function checkNotionIncompletion(
 async function notionUpToDateCheck(
   lastCheckedTodoistIndex: number
 ): Promise<number> {
-  // v4: getTasks() returns GetTasksResponse, unwrap with .results
-  const response = await todoistApi.getTasks({});
-  const taskList: Array<Task> = (response as any).results ?? (response as any).items ?? (response as any);
+  const taskList: Array<Task> = await todoistApi.getTasks();
 
   lastCheckedTodoistIndex = await checkTodoistCompletion(
     lastCheckedTodoistIndex,
@@ -485,8 +461,6 @@ async function todoistUpToDateCheck(lastCheckedNotionIndex: number) {
   return taskListLength - 1;
 }
 
-// ------------- Notion <-> Todoist manual sync functions --------------//
-
 async function swapNotionSyncStatus(notionPageID: string): Promise<void> {
   await notionApi.pages.update({
     page_id: notionPageID,
@@ -522,10 +496,7 @@ async function notionManualUpdates(): Promise<void> {
 }
 
 async function todoistManualUpdates(): Promise<void> {
-  // v4: use getTasks with label filter; filter param removed, use getTasksByFilter or filter client-side
-  const response = await todoistApi.getTasks({});
-  const allTasks: Array<Task> = (response as any).results ?? (response as any).items ?? (response as any);
-  // p3 = priority 3; filter client-side since v4 removed filter param from getTasks
+  const allTasks: Array<Task> = await todoistApi.getTasks();
   const taskList: Array<Task> = allTasks.filter(t => t.priority === 3);
 
   if (taskList.length) {
@@ -545,8 +516,6 @@ async function todoistManualUpdates(): Promise<void> {
   }
 }
 
-// ---------------------- Automation/Sync interval -------------------------//
-
 async function intervalStart() {
   let latestNotionIndex = -1;
   let latestTodoistIndex = -1;
@@ -560,8 +529,6 @@ async function intervalStart() {
       .then(todoistManualUpdates);
   }, 10000);
 }
-
-// ----------------------------- Main ---------------------------------//
 
 const IDs = {
   todoistTaskIDs: [''],
