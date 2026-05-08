@@ -1,0 +1,31 @@
+name: Regenerate package-lock.json
+
+on:
+  workflow_dispatch:
+
+jobs:
+  regen-lockfile:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Remove old lockfile
+        run: rm -f package-lock.json
+
+      - name: Regenerate package-lock.json
+        run: npm install
+
+      - name: Commit and push updated lockfile
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "chore: regenerate package-lock.json for todoist-api-typescript v3"
+          git push
