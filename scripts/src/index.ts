@@ -267,7 +267,7 @@ function myNotionIndexOf(notionpageID: string): number {
 }
 
 async function storeCurrentSyncedTasks(): Promise<void> {
-  const todoistTaskList = await todoistApi.getTasks();
+  const todoistTaskList: Task[] = Array.from(await todoistApi.getTasks());
   const len: number = todoistTaskList.length;
 
   for (let i = 0; i < len; i++) {
@@ -381,7 +381,7 @@ async function checkNotionCompletion(
 async function checkNotionIncompletion(
   taskList: Array<PageObjectResponse>
 ): Promise<void> {
-  const activeTodoistTasks = await todoistApi.getTasks();
+  const activeTodoistTasks: Task[] = Array.from(await todoistApi.getTasks());
   const activeTodoistTaskIds: Array<string> = activeTodoistTasks.map(t => t.id);
 
   const len = taskList.length;
@@ -402,7 +402,7 @@ async function checkNotionIncompletion(
 async function notionUpToDateCheck(
   lastCheckedTodoistIndex: number
 ): Promise<number> {
-  const taskList = await todoistApi.getTasks();
+  const taskList: Task[] = Array.from(await todoistApi.getTasks());
 
   lastCheckedTodoistIndex = await checkTodoistCompletion(
     lastCheckedTodoistIndex,
@@ -496,7 +496,7 @@ async function notionManualUpdates(): Promise<void> {
 }
 
 async function todoistManualUpdates(): Promise<void> {
-  const allTasks = await todoistApi.getTasks();
+  const allTasks: Task[] = Array.from(await todoistApi.getTasks());
   const taskList = allTasks.filter(t => t.priority === 3);
 
   if (taskList.length) {
