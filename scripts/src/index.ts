@@ -138,7 +138,7 @@ async function newNotionPage(todoistTask: Task): Promise<PageObjectResponse> {
         number: Number(todoistTask.id),
       },
       Status: {
-        checkbox: todoistTask.isCompleted ?? false,
+        checkbox: todoistTask.completedAt !== null,
       },
       URL: {
         url: todoistTask.url ?? null,
@@ -185,7 +185,7 @@ async function updateNotionPage(
         number: Number(todoistTask.id),
       },
       Status: {
-        checkbox: todoistTask.isCompleted ?? false,
+        checkbox: todoistTask.completedAt !== null,
       },
       URL: {
         url: todoistTask.url ?? null,
@@ -327,7 +327,7 @@ async function checkTodoistCompletion(
     for (let i = 0; i < IDs.todoistTaskIDs.length; i++) {
       const todoistID = IDs.todoistTaskIDs[i];
       const todoistTask = await todoistApi.getTask(todoistID);
-      if (todoistTask.isCompleted) {
+      if (todoistTask.completedAt !== null) {
         await updateNotionPage(IDs.notionPageIDs[i], todoistTask);
       }
     }
